@@ -39,6 +39,7 @@ library
       Network.Bitcoin.Api.Client
       Network.Bitcoin.Api.Types
       Network.Bitcoin.Api.Types.UnspentTransaction
+      Network.Bitcoin.Api.Types.ValidateAddress
       Network.Bitcoin.Api.Types.TxInfo
       Network.Bitcoin.Api.Types.UnspentTxOut
       Network.Bitcoin.Api.Types.HeaderInfo

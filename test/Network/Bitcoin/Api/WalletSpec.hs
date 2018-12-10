@@ -40,7 +40,7 @@ spec = do
        L.find (\(needle, _) -> needle == T.pack "emptyTestAccount") list `shouldSatisfy` isJust
 
        -- Extra validation that we can look up the balance of the account
-       balance <- Wallet.getAccountBalance client (T.pack "emptyTestAccount")
+       balance <- Wallet.getBalance client 
        balance `shouldBe` 0
 
    it "should be able to create a change address" $ do
@@ -53,10 +53,10 @@ spec = do
    it "should be able to move from one account to another" $ do
      testClient $ \client -> do
        _ <- Wallet.newAddressWith client (T.pack "testAccount")
-       balance <- Wallet.getAccountBalance client ("")
+       balance <- Wallet.getBalance client 
 
        _ <- Wallet.move client "" "testAccount" 1 `shouldReturn` True
 
        -- Validate that, after the move, our main account's balance has been
        -- reduced with exactly 1 BTC (which is the amount we're moving).
-       Wallet.getAccountBalance client ("") `shouldReturn` (balance - 1)
+       Wallet.getBalance client `shouldReturn` (balance - 1)

@@ -11,6 +11,7 @@ import qualified Data.Bitcoin.Types                           as BT
 import qualified Network.Bitcoin.Api.Internal                 as I
 import qualified Network.Bitcoin.Api.Types                    as T
 import           Network.Bitcoin.Api.Types.UnspentTransaction (UnspentTransaction)
+import           Network.Bitcoin.Api.Types.ValidateAddress    (ValidateAddress)
 
 -- | Lists unspent transaction with default parameters
 listUnspent :: T.Client
@@ -44,14 +45,17 @@ listAccountsWith client confirmations watchOnly =
   in
     return . HM.toList =<< I.call client "listaccounts" configuration
 
--- | Returns the amount of Btc currently held in the wallet by a specified
---   account.
-getAccountBalance :: T.Client         -- ^ Our client context
-                  -> BT.Account       -- ^ The account we're looking for
-                  -> IO BT.Btc        -- ^ Amount of Btc in wallet
-getAccountBalance client accountId =
-  -- FIXME: we should use the native 'getbalance' function here
-  return . snd . head . filter ((== accountId) . fst) =<< listAccounts client
+-- | Returns the amount of Btc currently held in the wallet
+getBalance :: T.Client         -- ^ Our client context
+           -> IO BT.Btc        -- ^ Amount of Btc in wallet
+getBalance client =
+  I.call client "getbalance" emptyArray
+
+-- | Returns the current block count
+getBlockCount :: T.Client      -- ^ Our client context
+              -> IO Integer    -- ^ Current block count
+getBlockCount client =
+  I.call client "getblockcount" emptyArray
 
 -- | Provides access to a new receiving address filed under the default account.
 --   Intended to be published to another party that wishes to send you money.
@@ -114,3 +118,11 @@ sendToAddress :: T.Client
 sendToAddress client address amount =
     let configuration = [toJSON address, toJSON amount]
     in I.call client "sendtoaddress" configuration
+
+-- | Validate a specific address
+validateAddress :: T.Client
+                -> BT.Address
+                -> IO ValidateAddress
+validateAddress client address = 
+    let configuration = [toJSON address]
+    in I.call client "validateaddress" configuration

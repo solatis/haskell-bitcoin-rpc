@@ -16,6 +16,7 @@ import           Control.Lens                                 ((^.), (^?))
 import qualified Data.Base58String                            as B58S
 import qualified Data.Bitcoin.Block                           as Btc hiding (encode, decode)
 import qualified Data.Bitcoin.Transaction                     as Btc
+import qualified Data.ByteString                              as B
 
 import qualified Data.Bitcoin.Types                           as BT
 import qualified Network.Bitcoin.Api.Blockchain               as Blockchain
@@ -57,6 +58,70 @@ create client utxs outputs =
 
   in (return . Btc.decode) =<< I.call client "createrawtransaction" configuration
 
+createData :: T.Client               -- ^ The client session we are using
+           -> [UnspentTransaction]   -- ^ The inputs we are using for this transaction
+           -> [String]               -- ^ The data to include into OP_RETURN
+                                     --   Make sure your mining pool supports the 
+                                     --   OP_RETURN transaction size and amounts
+                                     --   before calling this function, otherwise
+                                     --   the mining pool will not likely mine your 
+                                     --   transaction.
+           -> IO Btc.Transaction
+createData client utxs message =
+  let configuration = [toJSON (map txToOutpoint utxs), toJSON (map outMessage message)]
+
+      txToOutpoint tx = object [
+        ("txid", toJSON (tx ^. transactionId)),
+        ("vout", toJSON (tx ^. vout))]
+
+      outMessage m = object [
+        ("data", toJSON m)]
+
+  in (return . Btc.decode) =<< I.call client "createrawtransaction" configuration
+
+
+createV :: T.Client               -- ^ The client session we are using
+        -> UnspentTransaction     -- ^ The input we are using for this transaction
+        -> Integer                -- ^ The vout number we are using for this transaction
+        -> (BT.Address, BT.Btc)   -- ^ A key/value pair which associates a
+                                  --   destination address with a specific amount
+                                  --   of bitcoins to send.
+       -> IO Btc.Transaction
+createV client utx voutN (addr, btc) =
+  let configuration = [toJSON ([(txToOutpoint utx)]), object [(B58S.toText addr, toJSON btc)]]
+
+      txToOutpoint tx = object [
+        ("txid", toJSON (utx ^. transactionId)),
+        ("vout", toJSON (voutN))]
+
+      outToAddress (addr, btc) = (B58S.toText addr, toJSON btc)
+
+  in (return . Btc.decode) =<< I.call client "createrawtransaction" configuration
+
+
+
+-- | Funds a raw transaction
+fund :: T.Client                     -- ^ Our client context
+     -> Btc.Transaction              -- ^ The transaction to fund
+     -> IO (Btc.Transaction, BT.Btc) -- ^ The funded transaction
+fund client tx = 
+  let configuration = [configTX, configOpts]
+      configTX      = toJSON (Btc.encode tx)
+      configOpts    = object [] 
+
+      extractTransaction res =
+        maybe
+          (error "Incorrect JSON response")
+          Btc.decode
+          (res ^? key "hex" . _JSON)
+      extractFee res =
+        fromMaybe
+          (error "Incorrect JSON response")
+          (res ^? key "fee" . _JSON)
+
+  in do
+    res <- I.call client "fundrawtransaction" configuration :: IO Value
+    return (extractTransaction res, extractFee res)
 
 -- | Signs a raw transaction with configurable parameters.
 sign :: T.Client                   -- ^ Our client context
@@ -100,7 +165,7 @@ sign client tx utxs pks =
           (res ^? key "complete" . _JSON)
 
   in do
-    res <- I.call client "signrawtransaction" configuration :: IO Value
+    res <- I.call client "signrawtransactionwithwallet" configuration :: IO Value
     return (extractTransaction res, extractCompleted res)
 
 -- | Sends a transaction through the Bitcoin network
@@ -109,7 +174,6 @@ send :: T.Client
      -> IO BT.TransactionId
 send client tx =
   let configuration = [toJSON (Btc.encode tx)]
-
   in I.call client "sendrawtransaction" configuration
 
 -- | Returns a list of transactions that occured since a certain block height.

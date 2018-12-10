@@ -54,7 +54,7 @@ data UnspentTransaction = UnspentTransaction {
   --   redeem script.
   _redeemScript  :: Maybe T.Text
 
-  } deriving ( Show )
+  } deriving ( Show, Eq )
 
 makeLenses ''UnspentTransaction
 
